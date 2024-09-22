@@ -1,0 +1,67 @@
+body {
+    margin: auto;
+    border: 10px solid #0000001f;
+    width: 530px;
+    height: 530px;
+    position: relative;
+    top: 50px;
+    background-color: cornsilk;
+}
+
+div {
+    position: absolute;
+}
+
+img {
+    position: absolute;
+    z-index: 3;
+    width: 530px;
+    top: 17%;
+    /* vertical-align: middle; */
+    color: beige;
+    font: bold 40px/70px 微软雅黑;
+    text-align: center;
+    display: none;
+}
+
+div[name] {
+    z-index: 2;
+    width: 530px;
+    font: bold 17px/20px 微软雅黑;
+}
+
+#pause,
+#rank {
+    z-index: 2;
+    width: 550px;
+    height: 550px;
+    left: -10px;
+    top: -10px;
+    color: beige;
+    font: bold 40px/70px 微软雅黑;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.6);
+    /* display: none; */
+}
+
+#rank {
+    top: 560px;
+    height: auto;
+    color: #000;
+    font: bold 30px/50px 微软雅黑;
+    /* background-color: rgba(0, 0, 0, 0.85); */
+    display: none;
+}
+
+.boss {
+    z-index: 1;
+    font: 80%/160% 微软雅黑;
+    text-align: center;
+    opacity: 1;
+}
+
+.bullet_boss,
+.bullet_player,
+.res {
+    z-index: 0;
+}

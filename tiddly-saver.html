@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <title>TiddlyBackuper</title>
+  <style>
+    * {
+      transition: 150ms;
+    }
+
+    html {
+      color-scheme: dark;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    input {
+      outline: none;
+      border: 0;
+      border-radius: 15px;
+      font-size: 16px;
+      font-style: italic;
+      height: 100%;
+    }
+
+    .box {
+      margin: 10px;
+      padding: 15px;
+      border: 2px solid;
+      border-radius: 20px;
+      min-width: 500px;
+    }
+
+    #panels {
+      max-width: -webkit-fill-available;
+      width: 900px;
+      font-size: 20px;
+    }
+
+    .panel {
+      display: flex;
+      min-width: fit-content;
+    }
+
+    .panel>div {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 15px;
+      border-radius: 15px;
+      flex: 1;
+    }
+
+    input[type="button"]:hover {
+      scale: 1.03;
+    }
+
+    .panel>div>* {
+      margin: 3px 0;
+      padding: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="box" id="intro">
+    <h1>TiddlyBackuper</h1>
+    <blockquote>
+      <i>在线读写TiddlyWiki文件</i>
+    </blockquote>
+    <a href="./upgrade.html" target="_blank">更新</a>
+    <div id="info"></div>
+  </div>
+  <div class="box" id="panels">
+    <div class="panel" id="new">
+      <div fn="0">
+        <b>从url新建</b>
+        <input type="button" value="https://tiddlywiki.com/empty.html">
+        <input type="button" value="https://tiddlywiki.com/prerelease/empty.html">
+        <progress max="100" value="0" style="display: none;width: 100%;"></progress>
+      </div>
+      <hr>
+      <div fn="1">
+        <b>从模板文件新建</b>
+        <input type="button" value="单击此处选择模板文件">
+      </div>
+    </div>
+    <hr>
+    <div class="panel" id="open">
+      <div fn="2" title="右键删除最近文件">
+        <b>从最近文件打开</b>
+        <input type="button" value="demoFile-1" style="display: none;">
+        <input type="button" value="demoFile-2" style="display: none;">
+        <input type="button" value="demoFile-3" style="display: none;">
+        <input type="button" value="demoFile-4" style="display: none;">
+        <input type="button" value="demoFile-5" style="display: none;">
+      </div>
+      <hr>
+      <div fn="3">
+        <b>从本地文件打开</b>
+        <input type="button" value="单击此处选择本地文件">
+      </div>
+    </div>
+  </div>
+  <script>
+    /* From https://github.com/jakearchibald/idb-keyval */
+    const idbKeyval = (function (exports) {
+      'use strict';
+      class Store {
+        constructor(dbName = 'keyval-store', storeName = 'keyval') {
+          this.storeName = storeName;
+          this._dbp = new Promise((resolve, reject) => {
+            const openreq = indexedDB.open(dbName, 1);
+            openreq.onerror = () => reject(openreq.error);
+            openreq.onsuccess = () => resolve(openreq.result);
+            // First time setup: create an empty object store
+            openreq.onupgradeneeded = () => {
+              openreq.result.createObjectStore(storeName);
+            };
+          });
+        }
+        _withIDBStore(type, callback) {
+          return this._dbp.then(db => new Promise((resolve, reject) => {
+            const transaction = db.transaction(this.storeName, type);
+            transaction.oncomplete = () => resolve();
+            transaction.onabort = transaction.onerror = () => reject(transaction.error);
+            callback(transaction.objectStore(this.storeName));
+          }));
+        }
+      }
+      let store;
+      function getDefaultStore() {
+        if (!store)
+          store = new Store();
+        return store;
+      }
+      function get(key, store = getDefaultStore()) {
+        let req;
+        return store._withIDBStore('readonly', store => {
+          req = store.get(key);
+        }).then(() => req.result);
+      }
+      function set(key, value, store = getDefaultStore()) {
+        return store._withIDBStore('readwrite', store => {
+          store.put(value, key);
+        });
+      }
+      function del(key, store = getDefaultStore()) {
+        return store._withIDBStore('readwrite', store => {
+          store.delete(key);
+        });
+      }
+      function clear(store = getDefaultStore()) {
+        return store._withIDBStore('readwrite', store => {
+          store.clear();
+        });
+      }
+      function keys(store = getDefaultStore()) {
+        const keys = [];
+        return store._withIDBStore('readonly', store => {
+          // This would be store.getAllKeys(), but it isn't supported by Edge or Safari.
+          // And openKeyCursor isn't supported by Safari.
+          (store.openKeyCursor || store.openCursor).call(store).onsuccess = function () {
+            if (!this.result)
+              return;
+            keys.push(this.result.key);
+            this.result.continue();
+          };
+        }).then(() => keys);
+      }
+
+      exports.Store = Store;
+      exports.get = get;
+      exports.set = set;
+      exports.del = del;
+      exports.clear = clear;
+      exports.keys = keys;
+
+      return exports;
+    }({}));
+
+    /* This code modified from https://github.com/GoogleChromeLabs/text-editor/blob/main/src/inline-scripts/menu-recent.js */
+    // 最近文件管理器
+    const recentFm = {
+      async add(handle) {
+        let recentFiles = await this.get();
+        // 检查 isSameEntry 方法
+        if (!handle.isSameEntry) {
+          console.warn(`无法存储${handle.name}为最近文件`);
+          return recentFiles;
+        }
+        // 确保添加的 handle 事先不在 recentFiles 中
+        const inList = await Promise.all(recentFiles.map(f => handle.isSameEntry(f)));
+        if (inList.some(e => e)) {
+          return recentFiles;
+        }
+        // 添加 handle
+        recentFiles.unshift(handle);
+        idbKeyval.set('recentFiles', recentFiles);
+        return recentFiles;
+      },
+      async del(handle) {
+        let recentFiles = await this.get();
+        // 检查 isSameEntry 方法
+        if (!handle.isSameEntry) {
+          console.warn(`无法存储${handle.name}为最近文件`);
+          return recentFiles;
+        }
+        // 确保删除的 handle 事先在 recentFiles 中
+        const inList = await Promise.all(recentFiles.map(f => handle.isSameEntry(f)));
+        if (inList.every(e => !e)) {
+          return recentFiles;
+        }
+        // 删除 handle
+        recentFiles = recentFiles.filter((e, i) => !inList[i]);
+        idbKeyval.set('recentFiles', recentFiles);
+        return recentFiles;
+      },
+      async get() {
+        return (await idbKeyval.get('recentFiles')) || [];
+      },
+      async clear() {
+        await idbKeyval.del('recentFiles');
+      }
+    };
+
+    // 文件管理器
+    const Fm = {
+      async newFromUrl(url) {
+        const progress = $('progress');
+        progress.style.display = '';
+        const response = await fetch(url).then(res => res, err => 'url连接失败');
+        if (typeof response != 'object') {
+          progress.style.display = 'none';
+          return report(response);
+        }
+        const { headers, body } = response;
+        const contents = await new Promise((resolve, reject) => {
+          const total = +headers.get('content-length'),
+            reader = body.getReader(),
+            decoder = new TextDecoder('utf-8');
+          let loaded = 0,
+            chunks = [];
+          !async function pump() {
+            const { value, done } = await reader.read();
+            if (done) {
+              resolve(chunks.map(e => decoder.decode(e)).join(''));
+              return;
+            }
+            loaded += value.length;
+            chunks.push(value);
+            progress.value = (1e2 * loaded / total) / 5.5; // 这里似乎要除以5.5，结果才是正常进度值，我不知道为什么
+            pump();
+          }();
+        });
+        // const contents = await response.text();
+        this.setTwCustomSaver();
+        this.display({ contents });
+      },
+      async newFromFile() {
+        const handle = await getOpenFileHandle();
+        this.display({ handle });
+      },
+      async openFromRecentFile(handle) {
+        await handle.requestPermission({ mode: 'read' }); // 请求读写权限
+        this.display({ handle }, true);
+      },
+      async openFromFile() {
+        const handle = await getOpenFileHandle();
+        this.display({ handle }, true);
+      },
+      async display({ handle, contents }, use) {
+        this.setTwCustomSaver(use && handle);
+        contents ??= await handleToContents(handle);
+        document.open();
+        document.write(contents);
+        document.close();
+      },
+      async setTwCustomSaver(handle) {
+        async function save(text, method, callback) {
+          handle ??= await getSaveFileHandle();
+          const stream = await handle.createWritable();
+          await stream.seek(0);
+          await stream.write(new Blob([text], { type: "text/html" }));
+          await stream.close();
+          callback();
+          return true;
+        }
+        window.$tw = { customSaver: { save } };
+      }
+    };
+
+    const $ = document.querySelector.bind(document);
+    const $$ = document.querySelectorAll.bind(document);
+
+    async function handleToContents(handle) {
+      const file = await handle.getFile();
+      return await file.text();
+    }
+    async function getOpenFileHandle() {
+      const [handle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{ accept: { "text/html": [".html"] } }]
+      });
+      recentFm.add(handle);
+      return handle;
+    }
+    async function getSaveFileHandle() {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'Note.html',
+        types: [{ accept: { "text/html": [".html"] } }]
+      });
+      recentFm.add(handle);
+      return handle;
+    }
+    async function updateRecentFiles() {
+      const recentFilesBox = $('div[fn="2"]');
+      const demoFiles = recentFilesBox.querySelectorAll('input');
+      const files = await recentFm.get();
+      files.forEach((handle, i) => {
+        let elm;
+        if (i + 1 > demoFiles.length) {
+          elm = document.createElement('input');
+          recentFilesBox.appendChild(elm);
+        } else {
+          elm = demoFiles[i];
+        }
+        Object.assign(elm, {
+          value: handle.name,
+          handle,
+          style: '',
+        });
+      });
+    };
+    function report(info) {
+      $('#info').innerHTML += '<div><hr><b style="color: red">' + info + '</b></div>';
+    }
+
+    // 注册事件
+    window.addEventListener('load', e => {
+      // 检查浏览器是否支持 File System Access API
+      if (window.showOpenFilePicker && window.showSaveFilePicker) {
+        updateRecentFiles();
+      } else {
+        report('浏览器不支持 File System Access API<br>程序无法正常运行');
+      }
+    });
+    window.addEventListener('error', e => {
+      report(e.lineno + ' ' + e.message);
+    });
+    window.addEventListener('unhandledrejection', e => {
+      switch (e.reason.name) {
+        case 'AbortError': return;
+        case 'NotAllowedError': return;
+        case 'NotFoundError': return report('找不到该文件');
+        default: return report(e.reason.toString());
+      }
+    });
+    document.body.addEventListener('click', e => {
+      const { target } = e;
+      if (target.tagName != 'INPUT') return;
+      switch (target.parentElement?.getAttribute('fn')) {
+        case '0': return Fm.newFromUrl(target.value);
+        case '1': return Fm.newFromFile();
+        case '2': return Fm.openFromRecentFile(target.handle);
+        case '3': return Fm.openFromFile();
+      }
+    }, true);
+    document.body.addEventListener('contextmenu', async e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const { target } = e;
+      if (target.parentElement?.getAttribute('fn') != '2') return;
+      switch (target.tagName) {
+        case 'B': {
+          await recentFm.clear()
+          target.parentElement.innerHTML = target.outerHTML;
+          break;
+        }
+        case 'INPUT': {
+          await recentFm.del(target.handle)
+          target.remove();
+          break;
+        }
+      }
+    }, true);
+  </script>
+</body>
+
+</html>

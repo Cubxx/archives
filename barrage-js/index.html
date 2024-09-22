@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <link rel="icon" href="../close.png" />
+    <title>Barrage</title>
+    <link rel="stylesheet" href="./main.css" />
+    <!-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests"> -->
+</head>
+
+<body>
+    <!-- 功能 -->
+    <div id="img" style="height: 530px">
+        <img id="bad end" src="./media/bad end.gif" alt="图片加载中……" />
+        <img id="happey end" src="./media/happy end.gif" alt="奖励图片加载中……" />
+    </div>
+    <div id="audio">
+        <audio src="./media/bad end.aac"></audio>
+        <audio src="./media/happy end.aac"></audio>
+        <!-- <audio src="./media/boss dead.aac"></audio> -->
+        <!-- <audio src="./media/wipe.aac"></audio> -->
+        <!-- <audio src="./media/crash.aac"></audio> -->
+        <!-- <audio src="./media/bomb.aac"></audio> -->
+    </div>
+    <div id="panel" style="width: 530px; height: 530px">
+        <div name=" score" style="height: 20px; background-color: rgba(0, 0, 0, 0.12)"></div>
+        <div name="lives" style="top: 20px">
+            <div></div>
+            <div style="height: 20px; background-color: rgba(0, 0, 0, 0.12)"></div>
+        </div>
+        <div name="bombs" style="top: 40px">
+            <div></div>
+            <div style="height: 20px; background-color: rgba(0, 0, 0, 0.12); width: 530px"></div>
+        </div>
+        <div style="right: 5px; bottom: 0; font: italic 17px/20px 微软雅黑"></div>
+        <div style="right: 5px; top: 0; font: 18px/20px 微软雅黑"></div>
+    </div>
+    <div id="pause">
+        <br />Space - 开始/继续 <br />Z - 射击 <br />X - 开大 <br />Shift - 低速模式
+        <br />方向键 - 移动 <br />F5 - 重开
+    </div>
+    <div id="rank">
+        <div style="width: 550px; border-bottom: 4px solid #000" title="通关后才可以上传分数诶"></div>
+        <!-- 排行榜 -->
+        <div style="
+                    width: 275px;
+                    top: 50px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                "></div>
+        <div style="width: 275px; top: 50px; right: 0"></div>
+    </div>
+    <!-- 角色 -->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="./js/Stage Maker.js"></script>
+    <script src="./js/Bullet.js"></script>
+    <script src="./js/Player.js"></script>
+    <script src="./js/game.js"></script>
+</body>
+
+</html>
